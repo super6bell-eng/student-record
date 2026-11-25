@@ -1,0 +1,31 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>음성 메모 · LIFE & WORK</title>
+<style>*{box-sizing:border-box}body{font:16px/1.55 system-ui,sans-serif;color:#263d35;background:#f7f8f4;margin:0}main{margin:8vh auto;padding:24px;max-width:520px}section{background:#fffefa;border:1px solid #d4dfd5;border-radius:18px;padding:22px}h1{font-size:1.6rem;letter-spacing:-.05em;margin:0 0 16px}textarea{width:100%;min-height:135px;padding:12px;border:1px solid #bac8bc;border-radius:8px;font:inherit}button{font:inherit;padding:9px 13px;border:1px solid #bccbbf;border-radius:8px;background:#fffefa;color:inherit;cursor:pointer}button:disabled{opacity:.5}#record,#apply{background:#345d47;color:white}.tools{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}small{display:block;color:#506159}audio{width:100%}a{color:#315740}[hidden]{display:none!important}</style>
+<main><section><h1 id="title">음성 메모</h1><div class="tools"><button id="record">녹음 시작</button><button id="dictate">받아쓰기 시작</button></div><small id="status" role="status">마이크는 시작 버튼을 누를 때만 켜집니다.</small><p><textarea id="draft" aria-label="변환된 메모" placeholder="음성을 글로 변환하거나 여기에 직접 작성하세요."></textarea><small id="interim"></small></p><audio id="preview" controls hidden></audio><div class="tools"><button id="apply">메모에 넣기</button><a id="download" hidden download>녹음 파일 내려받기</a></div></section></main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id),args=new URLSearchParams(location.hash.slice(1)),nonce=args.get('id'),target=args.get('origin');
+const allowed=target&&/^https:\/\/(?:[a-z0-9.-]+\.googleusercontent\.com|script\.google\.com)$/.test(target)&&/^[\da-f-]{36}$/.test(nonce||'');
+let peer=null,rec=null,stream=null,blob=null,url='',speech=null,awaiting=false;
+function status(t){$('status').textContent=t}
+function stopTracks(){stream?.getTracks().forEach(t=>t.stop());stream=null}
+function post(type,data={}){if(peer&&allowed)peer.postMessage({type,id:nonce,...data},target)}
+addEventListener('message',e=>{if(!allowed||e.origin!==target||e.source!==opener||e.data?.id!==nonce)return;
+ if(e.data.type==='lw-voice-ping'){peer=e.source;post('lw-voice-ready')}
+ if(e.data.type==='lw-voice-received'&&awaiting){status('메모에 반영했습니다.');window.close()}});
+$('record').onclick=async()=>{if(rec?.state==='recording'){rec.stop();return;}const b=$('record');b.disabled=true;
+ try{stream=await navigator.mediaDevices.getUserMedia({audio:true});const recorder=new MediaRecorder(stream),parts=[];rec=recorder;recorder.ondataavailable=e=>{if(e.data.size)parts.push(e.data)};
+ recorder.onstop=()=>{stopTracks();rec=null;b.textContent='다시 녹음';if(url)URL.revokeObjectURL(url);blob=new Blob(parts,{type:recorder.mimeType||'audio/webm'});url=URL.createObjectURL(blob);$('preview').src=url;$('preview').hidden=false;$('download').href=url;$('download').download='음성메모.'+extension();$('download').hidden=false;status('미리 듣고 메모에 넣을 수 있습니다.');};
+ recorder.onerror=e=>{status('녹음 장치를 확인해 주세요.');stopTracks()};recorder.start(500);b.textContent='녹음 종료';status('녹음 중');}catch(e){stopTracks();status(e.name==='NotAllowedError'?'마이크가 허용되지 않았습니다. Chrome의 사이트 설정에서 마이크를 허용해 주세요.':'마이크를 열 수 없습니다. 기기 녹음 파일을 메모에 첨부할 수 있습니다.');}finally{b.disabled=false;}};
+function extension(){return /mp4/.test(blob?.type)?'m4a':/ogg/.test(blob?.type)?'ogg':'webm'}
+$('dictate').onclick=async()=>{if(speech){speech.stop();return;}const R=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!R){status('이 브라우저는 받아쓰기를 지원하지 않습니다. 아래 입력란에서 키보드 마이크를 사용해 주세요.');$('draft').focus();return;}
+ let local=false;try{local=typeof R.available==='function'&&await R.available({langs:['ko-KR'],processLocally:true})==='available';}catch{}
+ if(!local&&!confirm('이 기기에는 한국어 오프라인 인식이 없습니다. 브라우저의 음성 서비스로 음성을 전송하여 받아쓸까요? 학생 개인정보는 입력하지 마세요.'))return;
+ const r=new R();r.lang='ko-KR';r.continuous=true;r.interimResults=true;if(local)r.processLocally=true;r.onstart=()=>{$('title').textContent='음성 녹음 변환 중';$('dictate').textContent='변환 종료';status(local?'기기에서 한국어 인식 중':'브라우저 음성 서비스에서 한국어 인식 중');};
+ r.onresult=e=>{let partial='';for(let i=e.resultIndex;i<e.results.length;i++){const s=e.results[i][0].transcript;if(e.results[i].isFinal)$('draft').value+=($('draft').value?' ':'')+s;else partial+=s;}$('interim').textContent=partial;};
+ r.onerror=e=>status('음성 변환을 중단했습니다 ('+e.error+'). 입력한 내용은 남아 있습니다.');r.onend=()=>{speech=null;$('title').textContent='음성 메모';$('dictate').textContent='받아쓰기 시작';$('interim').textContent='';};try{speech=r;r.start()}catch{speech=null;status('음성 변환을 시작할 수 없습니다.');}};
+$('apply').onclick=()=>{if(rec?.state==='recording'||speech){status('녹음 또는 변환을 먼저 종료해 주세요.');return;}if(!blob&&!$('draft').value.trim()){status('음성을 녹음하거나 메모를 작성해 주세요.');return;}
+ if(!peer){status('원래 창과 연결되지 않았습니다. 텍스트를 복사하거나 녹음 파일을 내려받아 원래 메모에 첨부해 주세요.');return;}
+ awaiting=true;post('lw-voice-result',{text:$('draft').value,blob,ext:extension()});};
+addEventListener('pagehide',()=>{speech?.abort();stopTracks();if(url)URL.revokeObjectURL(url)});
+</script></html>
