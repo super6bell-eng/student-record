@@ -200,7 +200,7 @@ input,textarea,select{font-family:inherit;border:none;outline:none}
 <script>
 const TAGS=['상담','출결','교우관계','학습태도','진로','건강','특기사항','학부모','징계','봉사활동'];
 const TC={'상담':'#3b82f6','출결':'#ef4444','교우관계':'#a855f7','학습태도':'#f59e0b','진로':'#10b981','건강':'#ec4899','특기사항':'#6366f1','학부모':'#8b5cf6','징계':'#dc2626','봉사활동':'#0ea5e9'};
-let STU=[{id:20901,name:'강예은'},{id:20902,name:'고민주'},{id:20903,name:'곽수진'},{id:20904,name:'김민서'},{id:20905,name:'김민아'},{id:20906,name:'김송연'},{id:20907,name:'김수안'},{id:20908,name:'김예은'},{id:20909,name:'김주찬'},{id:20910,name:'김진경'},{id:20911,name:'김희현'},{id:20912,name:'류재석'},{id:20913,name:'맹지율'},{id:20914,name:'박성현'},{id:20915,name:'배주희'},{id:20916,name:'백운화'},{id:20917,name:'신지혜'},{id:20918,name:'양시온'},{id:20919,name:'엄지현'},{id:20920,name:'윤시후'},{id:20921,name:'이동현'},{id:20922,name:'이보미'},{id:20923,name:'이상화'},{id:20924,name:'이예담'},{id:20925,name:'이예은'},{id:20926,name:'이태헌'},{id:20927,name:'임예서'},{id:20928,name:'정시율'},{id:20929,name:'정하비'}];
+let STU=[];
 
 let API=localStorage.getItem('api_url')||'';
 let recs=[];  // {id, student, date, tags[], content}
@@ -243,7 +243,7 @@ function gasPost(data){
   });
 }
 
-// 학생 명단: 시트의 '학생명단' 탭에서 읽음 (못 읽으면 지난번 명단, 그것도 없으면 위의 기본 명단)
+// 학생 명단은 원본 시트에서 읽습니다. 처음 조회할 수 없으면 명단을 비워 둡니다.
 async function loadStudents(){
   var r=await gasGet('getStudents');
   if(r&&r.success&&Array.isArray(r.students)&&r.students.length){
